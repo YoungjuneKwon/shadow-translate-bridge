@@ -1,6 +1,6 @@
 {
   "name": "@winm2m/shadow-translate-bridge",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A bridge to sync Shadow DOM content with browser translation engines via Mirroring API",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
@@ -24,7 +24,10 @@
     "i18n",
     "mirroring"
   ],
-  "author": "Youngjune Kwon",
+  "author": "Youngjune Kwon <yjkwon@winm2m.com>",
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "peerDependencies": {
     "react": ">=16.8.0",
