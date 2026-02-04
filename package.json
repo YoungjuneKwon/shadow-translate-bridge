@@ -1,6 +1,6 @@
 {
   "name": "@winm2m/shadow-translate-bridge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A bridge to sync Shadow DOM content with browser translation engines via Mirroring API",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",

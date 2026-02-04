@@ -78,13 +78,55 @@ const MyShadowComponent = ({ initialTitle }: Props) => {
 export default MyShadowComponent;
 ```
 
+### 3. Clear all registered bridges (optional)
+If you need to reset the mirror (for example, after a full UI teardown), use useClearTranslateBridge.
+
+```TypeScript
+import React from 'react';
+import { useClearTranslateBridge } from '@winm2m/shadow-translate-bridge';
+
+const ResetTranslationsButton = () => {
+  const clearTranslateBridge = useClearTranslateBridge();
+
+  return (
+    <button type="button" onClick={() => clearTranslateBridge()}>
+      Reset translations
+    </button>
+  );
+};
+
+export default ResetTranslationsButton;
+```
+
+### 4. Clear on route change (example)
+When changing routes, you can clear registered bridges to avoid stale mirror entries.
+
+```TypeScript
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useClearTranslateBridge } from '@winm2m/shadow-translate-bridge';
+
+const RouteBridgeCleaner = () => {
+  const clearTranslateBridge = useClearTranslateBridge();
+  const location = useLocation();
+
+  useEffect(() => {
+    clearTranslateBridge();
+  }, [location.key, clearTranslateBridge]);
+
+  return null;
+};
+
+export default RouteBridgeCleaner;
+```
+
 
 ## How it works under the hood
 Unique Identity: The library assigns a unique UUID to every registered text string.
 
 Invisible DOM: It creates a container <div id="shadow-translate-bridge-mirror"> appended to document.body. This container is visually hidden (using clip, not display: none) so browsers still recognize it as "translatable content."
 
-Performance: Instead of attaching an observer to every single element, it uses one single MutationObserver on the container to monitor all text changes efficiently.
+Performance: Instead of attaching an observer to every single element, it uses one single MutationObserver on the container to monitor all text changes efficiently. Identical strings are mirrored only once and reused across registrations.
 
 ## Requirements & Limitations
 React: Requires React 16.8+ (Hooks support).
