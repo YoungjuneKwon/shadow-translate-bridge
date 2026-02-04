@@ -148,17 +148,11 @@
       import { r2wc } from "https://esm.sh/r2wc@0.0.4";
       import {
         TranslationBridgeProvider,
-        useShadowTranslation,
+        useTranslateBridge,
       } from "@winm2m/shadow-translate-bridge";
 
       const e = React.createElement;
-
       const ShadowCardContent = () => {
-        const [title, setTitle] = useState("Shadow translation demo");
-        const [detail, setDetail] = useState("This sentence inside the Shadow DOM should translate.");
-
-        useShadowTranslation(title, setTitle);
-        useShadowTranslation(detail, setDetail);
         return e(
           "article",
           {
@@ -185,12 +179,12 @@
           e(
             "h2",
             { style: { margin: "12px 0 10px", fontSize: "24px" } },
-            title
+            useTranslateBridge("Shadow translation demo")
           ),
           e(
             "p",
             { style: { margin: 0, fontSize: "16px", lineHeight: 1.6 } },
-            detail
+            useTranslateBridge("This sentence inside the Shadow DOM should translate.")
           ),
           e(
             "p",

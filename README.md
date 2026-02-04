@@ -51,33 +51,24 @@ export default Root;
 ```
 
 ### 2. Use the Hook in your Component
-Inside your React component (which lives inside the Web Component/Shadow DOM), use the useShadowTranslation hook.
+Inside your React component (which lives inside the Web Component/Shadow DOM), use the useTranslateBridge hook.
 
 ```TypeScript
-import React, { useState } from 'react';
-import { useShadowTranslation } from '@winm2m/shadow-translate-bridge';
+import React from 'react';
+import { useTranslateBridge } from '@winm2m/shadow-translate-bridge';
 
 interface Props {
   initialTitle: string;
 }
 
 const MyShadowComponent = ({ initialTitle }: Props) => {
-  // 1. Maintain the text in local state
-  const [displayTitle, setDisplayTitle] = useState(initialTitle);
-
-  // 2. Register the text with the bridge
-  // - First argument: The text you want to translate (source of truth)
-  // - Second argument: Callback that runs when the browser translates the text
-  useShadowTranslation(initialTitle, (translatedText) => {
-    setDisplayTitle(translatedText);
-  });
+  const displayTitle = useTranslateBridge(initialTitle);
 
   return (
     <div className="card">
-      {/* 3. Render the state, not the prop directly */}
       <h1>{displayTitle}</h1>
       <p>
-        Try right-clicking and selecting "Translate to [Language]" 
+        Try right-clicking and selecting "Translate to [Language]"
         in Chrome!
       </p>
     </div>
