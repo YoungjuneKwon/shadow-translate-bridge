@@ -1,0 +1,33 @@
+{
+  "name": "@winm2m/shadow-translate-bridge",
+  "version": "0.1.0",
+  "description": "A bridge to sync Shadow DOM content with browser translation engines via Mirroring API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "react",
+    "web-component",
+    "shadow-dom",
+    "google-translate",
+    "i18n",
+    "mirroring"
+  ],
+  "author": "Youngjune Kwon",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

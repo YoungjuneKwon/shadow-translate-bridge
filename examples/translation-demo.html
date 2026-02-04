@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shadow Translate Bridge Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;600&display=swap"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1f2230;
+        --muted: #6b7280;
+        --accent: #1f6feb;
+        --bg-start: #f6f1e6;
+        --bg-end: #eef5ff;
+        --card: #ffffff;
+        --ring: rgba(31, 111, 235, 0.25);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(120% 120% at 20% 0%, var(--bg-start), var(--bg-end));
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      .frame {
+        width: min(960px, 100%);
+        background: var(--card);
+        border-radius: 24px;
+        padding: 32px;
+        box-shadow: 0 24px 60px rgba(31, 34, 48, 0.12);
+        border: 1px solid rgba(31, 34, 48, 0.08);
+      }
+
+      .heading {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .heading h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 38px);
+        letter-spacing: -0.02em;
+      }
+
+      .heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(31, 111, 235, 0.1);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+        margin-top: 28px;
+      }
+
+      .note {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px dashed rgba(31, 34, 48, 0.16);
+        background: rgba(31, 111, 235, 0.04);
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--ink);
+      }
+
+      shadow-translate-demo {
+        display: block;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid rgba(31, 34, 48, 0.12);
+        box-shadow: 0 18px 40px rgba(31, 34, 48, 0.1);
+      }
+
+      @media (min-width: 760px) {
+        .layout {
+          grid-template-columns: 1.1fr 0.9fr;
+          align-items: start;
+        }
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.2.0",
+          "react-dom": "https://esm.sh/react-dom@18.2.0"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="frame">
+      <div class="heading">
+        <span class="pill">Shadow Translate Bridge Demo</span>
+        <h1>Chrome translation test with a closed Shadow DOM</h1>
+        <p>
+          This sentence lives in the light DOM, outside the web component, and should
+          translate when Chrome Translate is enabled.
+        </p>
+      </div>
+
+      <section class="layout">
+        <div class="note">
+          Open Chrome Translate (right-click the page and choose Translate). The text
+          below includes a closed shadow web component built with r2wc. Inside that
+          component, only the registered strings use the bridge and should translate.
+        </div>
+
+        <shadow-translate-demo></shadow-translate-demo>
+      </section>
+    </main>
+
+    <script type="module">
+      import React, {
+        useContext,
+        useEffect,
+        useMemo,
+        useRef,
+        useState,
+      } from "https://esm.sh/react@18.2.0";
+      import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
+
+      const createId = () => {
+        if (crypto?.randomUUID) {
+          return crypto.randomUUID();
+        }
+        const t = Date.now().toString(16);
+        const r = Math.random().toString(16).slice(2);
+        return `stb-${t}-${r}`;
+      };
+
+      class MirrorManager {
+        constructor() {
+          this.container = document.createElement("div");
+          this.container.id = "shadow-translate-bridge-mirror";
+
+          Object.assign(this.container.style, {
+            position: "absolute",
+            width: "1px",
+            height: "1px",
+            padding: "0",
+            margin: "-1px",
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            borderWidth: "0",
+            opacity: "0",
+            pointerEvents: "none",
+            zIndex: "-1000",
+          });
+
+          const existing = document.getElementById("shadow-translate-bridge-mirror");
+          if (!existing) {
+            document.body.appendChild(this.container);
+          } else {
+            this.container = existing;
+          }
+
+          this.observers = new Map();
+          this.mutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === "childList" || mutation.type === "characterData") {
+                let target = mutation.target;
+                if (target.nodeType === Node.TEXT_NODE) {
+                  target = target.parentElement;
+                }
+                const id = target?.dataset?.mirrorId;
+                if (id && this.observers.has(id)) {
+                  const translatedText = target.innerText;
+                  this.observers.get(id)(translatedText);
+                }
+              }
+            });
+          });
+
+          this.mutationObserver.observe(this.container, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          });
+        }
+
+        register(value, onChange) {
+          const id = `stb-${createId()}`;
+          this.observers.set(id, onChange);
+
+          const el = document.createElement("span");
+          el.dataset.mirrorId = id;
+          el.innerText = value;
+          el.style.display = "block";
+          this.container.appendChild(el);
+
+          return id;
+        }
+
+        updateValue(id, newValue) {
+          const el = this.container.querySelector(`[data-mirror-id="${id}"]`);
+          if (el && el.innerText !== newValue) {
+            el.innerText = newValue;
+          }
+        }
+
+        unregister(id) {
+          this.observers.delete(id);
+          const el = this.container.querySelector(`[data-mirror-id="${id}"]`);
+          el?.remove();
+        }
+      }
+
+      const BridgeContext = React.createContext(null);
+
+      const TranslationBridgeProvider = ({ children }) => {
+        const manager = useMemo(() => new MirrorManager(), []);
+        const api = useMemo(
+          () => ({
+            register: (val, cb) => manager.register(val, cb),
+            unregister: (id) => manager.unregister(id),
+            updateValue: (id, val) => manager.updateValue(id, val),
+          }),
+          [manager]
+        );
+
+        return e(BridgeContext.Provider, { value: api }, children);
+      };
+
+      const useShadowTranslation = (value, onChange) => {
+        const bridge = useContext(BridgeContext);
+        const idRef = useRef(null);
+
+        if (!bridge) {
+          console.warn(
+            "useShadowTranslation must be used within a TranslationBridgeProvider"
+          );
+          return;
+        }
+
+        useEffect(() => {
+          idRef.current = bridge.register(value, onChange);
+          return () => {
+            if (idRef.current) bridge.unregister(idRef.current);
+          };
+        }, []);
+
+        useEffect(() => {
+          if (idRef.current) bridge.updateValue(idRef.current, value);
+        }, [value, bridge]);
+      };
+
+      const e = React.createElement;
+
+      const ShadowCardContent = () => {
+        const baseTitle = "Shadow translation demo";
+        const baseDetail = "This sentence inside the Shadow DOM should translate.";
+
+        const [title, setTitle] = useState(baseTitle);
+        const [detail, setDetail] = useState(baseDetail);
+
+        useShadowTranslation(baseTitle, setTitle);
+        useShadowTranslation(baseDetail, setDetail);
+
+        return e(
+          "article",
+          {
+            style: {
+              padding: "28px",
+              background: "linear-gradient(140deg, #fdf7ef, #eef2ff)",
+              fontFamily: "IBM Plex Sans, Segoe UI, sans-serif",
+            },
+          },
+          e(
+            "p",
+            {
+              style: {
+                margin: 0,
+                color: "#1f6feb",
+                fontWeight: 600,
+                fontSize: "12px",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              },
+            },
+            "Closed Shadow Web Component"
+          ),
+          e(
+            "h2",
+            { style: { margin: "12px 0 10px", fontSize: "24px" } },
+            title
+          ),
+          e(
+            "p",
+            { style: { margin: 0, fontSize: "16px", lineHeight: 1.6 } },
+            detail
+          ),
+          e(
+            "p",
+            {
+              style: {
+                margin: "12px 0 0",
+                color: "#6b7280",
+                fontSize: "15px",
+                lineHeight: 1.6,
+              },
+            },
+            "This sentence stays in English because it is not registered."
+          )
+        );
+      };
+
+      const ShadowCard = () =>
+        e(TranslationBridgeProvider, null, e(ShadowCardContent));
+
+      class ShadowTranslateDemo extends HTMLElement {
+        constructor() {
+          super();
+          this._shadow = this.attachShadow({ mode: "closed" });
+          this._mount = document.createElement("div");
+          this._shadow.appendChild(this._mount);
+          this._root = createRoot(this._mount);
+        }
+
+        connectedCallback() {
+          this._root.render(e(ShadowCard));
+        }
+
+        disconnectedCallback() {
+          this._root.unmount();
+        }
+      }
+
+      customElements.define("shadow-translate-demo", ShadowTranslateDemo);
+    </script>
+  </body>
+</html>
