@@ -49,25 +49,12 @@ class MirrorManager {
   private instanceToCallback: Map<string, TranslationCallback> = new Map();
   private instanceToMode: Map<string, TranslateMode> = new Map();
   private mutationObserver: MutationObserver;
+  private refreshRafId: number | null = null;
+  private isRefreshing = false;
 
   constructor() {
     this.container = document.createElement("div");
     this.container.id = "shadow-translate-bridge-mirror";
-
-    Object.assign(this.container.style, {
-      position: "absolute",
-      width: "1px",
-      height: "1px",
-      padding: "0",
-      margin: "-1px",
-      overflow: "hidden",
-      clip: "rect(0, 0, 0, 0)",
-      whiteSpace: "nowrap",
-      borderWidth: "0",
-      opacity: "0",
-      pointerEvents: "none",
-      zIndex: "-1000",
-    });
 
     if (!document.getElementById("shadow-translate-bridge-mirror")) {
       document.body.appendChild(this.container);
@@ -76,6 +63,20 @@ class MirrorManager {
         "shadow-translate-bridge-mirror",
       ) as HTMLDivElement;
     }
+
+    this.container.setAttribute("aria-hidden", "true");
+    Object.assign(this.container.style, {
+      position: "fixed",
+      left: "0",
+      top: "0",
+      width: "1px",
+      height: "1px",
+      fontSize: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+      zIndex: "-1",
+      contain: "layout paint",
+    });
 
     this.mutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -154,6 +155,8 @@ class MirrorManager {
 
     this.container.appendChild(el);
 
+    this.scheduleTranslateRefresh();
+
     const instanceId = `stb-i-${uuidv4()}`;
     this.instanceToMirror.set(instanceId, mirrorId);
     this.instanceToCallback.set(instanceId, onChange);
@@ -200,6 +203,7 @@ class MirrorManager {
           el.innerText = newValue;
         }
       }
+      this.scheduleTranslateRefresh();
       this.valueToMirror.delete(
         this.getValueKey(currentEntry.mode, currentEntry.value),
       );
@@ -239,6 +243,7 @@ class MirrorManager {
     this.container.appendChild(el);
     this.instanceToMirror.set(instanceId, newMirrorId);
     this.instanceToMode.set(instanceId, mode);
+    this.scheduleTranslateRefresh();
   }
 
   unregister(instanceId: string) {
@@ -396,6 +401,34 @@ class MirrorManager {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  private isTranslateActive() {
+    const root = document.documentElement;
+    return (
+      root.classList.contains("translated-ltr") ||
+      root.classList.contains("translated-rtl")
+    );
+  }
+
+  private scheduleTranslateRefresh() {
+    if (!this.isTranslateActive()) return;
+    if (this.refreshRafId !== null) return;
+    this.refreshRafId = window.requestAnimationFrame(() => {
+      this.refreshRafId = null;
+      this.refreshTranslation();
+    });
+  }
+
+  private refreshTranslation() {
+    if (this.isRefreshing) return;
+    this.isRefreshing = true;
+    const children = Array.from(this.container.children) as HTMLElement[];
+    children.forEach((child) => {
+      const clone = child.cloneNode(true) as HTMLElement;
+      child.replaceWith(clone);
+    });
+    this.isRefreshing = false;
   }
 }
 
