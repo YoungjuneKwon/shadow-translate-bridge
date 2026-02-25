@@ -64,19 +64,8 @@ class MirrorManager {
       ) as HTMLDivElement;
     }
 
-    this.container.setAttribute("aria-hidden", "true");
-    Object.assign(this.container.style, {
-      position: "fixed",
-      left: "0",
-      top: "0",
-      width: "1px",
-      height: "1px",
-      fontSize: "1px",
-      opacity: "0",
-      pointerEvents: "none",
-      zIndex: "-1",
-      contain: "layout paint",
-    });
+    this.applyHiddenStyles(this.container);
+    this.applyProbeStyles();
 
     this.mutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -121,6 +110,7 @@ class MirrorManager {
     onChange: TranslationCallback,
     options?: TranslateOptions,
   ): string {
+    this.applyProbeStyles();
     const mode = this.getTranslateMode(options);
     const key = this.getValueKey(mode, value);
     const existing = this.valueToMirror.get(key);
@@ -401,6 +391,28 @@ class MirrorManager {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  private applyHiddenStyles(element: HTMLElement) {
+    element.setAttribute("aria-hidden", "true");
+    Object.assign(element.style, {
+      position: "fixed",
+      left: "0",
+      top: "0",
+      width: "1px",
+      height: "1px",
+      fontSize: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+      zIndex: "-1",
+      contain: "layout paint",
+    });
+  }
+
+  private applyProbeStyles() {
+    const probe = document.getElementById("i18n-language-probe");
+    if (!probe) return;
+    this.applyHiddenStyles(probe);
   }
 
   private isTranslateActive() {
