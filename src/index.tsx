@@ -40,6 +40,64 @@ const HTML_TEXT_PLACEHOLDER_PREFIX = "__STB_TEXT_";
 const HTML_TEXT_PLACEHOLDER_SUFFIX = "__";
 const HTML_SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT"]);
 
+function extractHtmlTextSegments(html: string): {
+  template: string;
+  textSegments: string[];
+} {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const textSegments: string[] = [];
+
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  let current = walker.nextNode();
+  while (current) {
+    const textNode = current as Text;
+    const parent = textNode.parentElement;
+    const text = textNode.textContent || "";
+    if (parent && !HTML_SKIP_TAGS.has(parent.tagName) && text.trim()) {
+      textNodes.push(textNode);
+    }
+    current = walker.nextNode();
+  }
+
+  textNodes.forEach((textNode, index) => {
+    const text = textNode.textContent || "";
+    textSegments.push(text);
+    const wrapper = doc.createElement("shadowtranslated");
+    wrapper.setAttribute("data-mirror-id", String(index));
+    wrapper.textContent = text;
+    textNode.parentNode?.replaceChild(wrapper, textNode);
+  });
+
+  return {
+    template: doc.body.innerHTML,
+    textSegments,
+  };
+}
+
+function rebuildTranslatedHtml(
+  template: string,
+  translatedTexts: Map<number, string>,
+): string {
+  return template.replace(
+    /<shadowtranslated data-mirror-id="(\d+)">[\s\S]*?<\/shadowtranslated>/gi,
+    (_match: string, id: string) => {
+      const index = Number(id);
+      if (translatedTexts.has(index)) {
+        const text = translatedTexts.get(index)!;
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+      return _match;
+    },
+  );
+}
+
 class MirrorManager {
   private container: HTMLDivElement;
   private observers: Map<string, Set<TranslationCallback>> = new Map();
@@ -448,7 +506,7 @@ const BridgeContext = createContext<BridgeState | null>(null);
 
 export const TranslationBridgeProvider: React.FC<{
   children: React.ReactNode;
-}> = ({ children }) => {
+}> = ({ children }: { children: React.ReactNode }) => {
   const manager = useMemo(() => new MirrorManager(), []);
 
   const api = useMemo(
@@ -506,9 +564,62 @@ export const useTranslateBridge = (value: string) => {
 };
 
 export const useTranslateBridgeHtml = (value: string) => {
+  const bridge = useContext(BridgeContext);
   const [translated, setTranslated] = useState(value);
+  const registeredIdsRef = useRef<string[]>([]);
+  const templateRef = useRef<string>("");
+  const translatedTextsRef = useRef(new Map<number, string>());
 
-  useShadowTranslation(value, setTranslated, { mode: "html" });
+  useEffect(() => {
+    if (!bridge) {
+      console.warn(
+        "useTranslateBridgeHtml must be used within a TranslationBridgeProvider",
+      );
+      return;
+    }
+
+    // Clean up previous registrations
+    registeredIdsRef.current.forEach((id) => bridge.unregister(id));
+    registeredIdsRef.current = [];
+    translatedTextsRef.current.clear();
+
+    // Reset to the new value immediately
+    setTranslated(value);
+
+    if (!value) return;
+
+    // Parse HTML and extract pure text segments
+    const { template, textSegments } = extractHtmlTextSegments(value);
+    templateRef.current = template;
+
+    if (textSegments.length === 0) return;
+
+    // Initialize translated texts map with original values
+    textSegments.forEach((text, index) => {
+      translatedTextsRef.current.set(index, text);
+    });
+
+    // Register each text segment individually for translation (text mode)
+    const ids: string[] = [];
+    textSegments.forEach((text, index) => {
+      const id = bridge.register(text, (translatedText: string) => {
+        translatedTextsRef.current.set(index, translatedText);
+        setTranslated(
+          rebuildTranslatedHtml(
+            templateRef.current,
+            translatedTextsRef.current,
+          ),
+        );
+      });
+      ids.push(id);
+    });
+    registeredIdsRef.current = ids;
+
+    return () => {
+      registeredIdsRef.current.forEach((id) => bridge.unregister(id));
+      registeredIdsRef.current = [];
+    };
+  }, [value, bridge]);
 
   return translated;
 };
